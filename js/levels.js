@@ -77,7 +77,7 @@ function fluor(x, y, z, len = 2, axis = 'x', o = {}) {
   E.scene.add(tube);
   let light = null;
   if (o.light !== false) {
-    light = new THREE.PointLight(o.color || 0xd8e2cc, o.i || 12, o.dist || 11);
+    light = new THREE.PointLight(o.color || 0xd8e2cc, o.i || 22, o.dist || 17);
     light.position.set(x, y - .3, z);
     E.scene.add(light);
   }
@@ -87,7 +87,7 @@ function fluor(x, y, z, len = 2, axis = 'x', o = {}) {
 function redLamp(x, y, z, i = 8) {
   const b = new THREE.Mesh(new THREE.SphereGeometry(.1, 6, 6), new THREE.MeshBasicMaterial({ color: 0xc84a3a }));
   b.position.set(x, y, z); E.scene.add(b);
-  const l = new THREE.PointLight(0xc84a3a, i, 9);
+  const l = new THREE.PointLight(0xc84a3a, i * 1.6, 13);
   l.position.set(x, y, z); E.scene.add(l);
   return { b, l };
 }
@@ -231,7 +231,8 @@ function skyOutdoor(fogColor, fogDensity, discColor) {
 function interiorAtmo(color = 0x0a0c0e, density = .045, amb = .18) {
   E.scene.background = new THREE.Color(color);
   E.scene.fog = new THREE.FogExp2(color, density);
-  E.scene.add(new THREE.AmbientLight(0x8a92a0, amb));
+  E.scene.add(new THREE.AmbientLight(0x9aa2b0, amb));
+  E.scene.add(new THREE.HemisphereLight(0x8a94a4, 0x3a3a34, .45));
 }
 
 /* =====================================================
@@ -239,7 +240,7 @@ function interiorAtmo(color = 0x0a0c0e, density = .045, amb = .18) {
 ===================================================== */
 
 function level1() {
-  interiorAtmo(0x07090b, .04, .16);
+  interiorAtmo(0x0b0e12, .028, .5);
   W.flags.hardFloor = true;
   flickers.length = 0;
 
@@ -470,7 +471,7 @@ function level1() {
 ===================================================== */
 
 function level2() {
-  interiorAtmo(0x08090b, .038, .15);
+  interiorAtmo(0x0b0d10, .026, .48);
   W.flags.hardFloor = true;
   flickers.length = 0;
 
@@ -618,8 +619,8 @@ function level2() {
 ===================================================== */
 
 function level3() {
-  skyOutdoor(0x2e3038, .016, 0xe8e4d4);
-  E.scene.add(new THREE.HemisphereLight(0x5a6270, 0x1c1a16, .55));
+  skyOutdoor(0x3a3d46, .013, 0xe8e4d4);
+  E.scene.add(new THREE.HemisphereLight(0x6a7280, 0x2c2a24, .95));
   W.flags.hardFloor = false;
   flickers.length = 0;
 
@@ -742,8 +743,8 @@ function level3() {
 ===================================================== */
 
 function level4() {
-  skyOutdoor(0x272b30, .02, 0xe8e4d4);
-  E.scene.add(new THREE.HemisphereLight(0x4a525e, 0x16140f, .5));
+  skyOutdoor(0x33373e, .016, 0xe8e4d4);
+  E.scene.add(new THREE.HemisphereLight(0x5a626e, 0x24221c, .9));
   W.flags.hardFloor = true;
   flickers.length = 0;
 
