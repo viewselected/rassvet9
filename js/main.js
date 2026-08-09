@@ -1,19 +1,16 @@
-// ПРОСВЕТ-9 · вход
-import * as THREE from 'three';
+// ПРОСВЕТ-9 v2 · вход
 import { E, initEngine, renderFrame, clearScene, lockPointer } from './engine.js';
 import { buildTextures, Snd } from './assets.js';
-import { W, P, updatePlayer, updateEnemies, updateSubtitles, updateHUD,
-         attack, switchWeapon, damage, spawnPlayer, toast, subtitle,
-         showPaper, hidePaper, paperOpen } from './game.js';
-import { LEVELS, setLevelEndHandler, setCurrentLevel } from './levels.js';
+import { W, P, updatePlayer, updateEnemies, updateSubtitles, updateHUD, clearSubtitles,
+         startFire, stopFire, startReload, switchWeapon, toast,
+         hidePaper, paperOpen } from './game.js';
+import { LEVELS, setLevelEndHandler } from './levels.js';
 
 const SAVE_KEY = 'prosvet9_level';
 let running = false, levelVhs = 0, levelIdx = 0;
 
 initEngine();
 buildTextures();
-
-/* ---------- меню ---------- */
 
 const menu = document.getElementById('menu');
 const hud = document.getElementById('hud');
@@ -23,7 +20,7 @@ const saved = parseInt(localStorage.getItem(SAVE_KEY) || '0', 10);
 if (saved > 0 && LEVELS[saved]?.build) {
   const b = document.getElementById('btn-continue');
   b.style.display = 'block';
-  b.textContent = `продолжить обследование — участок ${LEVELS[saved].id}: «${LEVELS[saved].name}»`;
+  b.textContent = `продолжить — глава ${LEVELS[saved].id}: «${LEVELS[saved].name}»`;
 }
 
 document.getElementById('btn-new').onclick = () => startLevel(0);
@@ -38,7 +35,7 @@ document.getElementById('btn-levels').onclick = () => {
     b.className = 'btn lv';
     b.dataset.locked = lv.build ? '0' : '1';
     b.innerHTML = `<span class="n">${String(lv.id).padStart(2, '0')}</span>${lv.name}` +
-                  (lv.build ? '' : ' · в разработке');
+                  (lv.build ? '' : ' · опечатано');
     if (lv.build) b.onclick = () => startLevel(i);
     box.appendChild(b);
   });
@@ -50,7 +47,6 @@ document.getElementById('btn-respawn').onclick = () => {
 
 function startLevel(i) {
   levelIdx = i;
-  setCurrentLevel(i);
   localStorage.setItem(SAVE_KEY, String(i));
   Snd.init(); Snd.resume();
 
@@ -60,11 +56,12 @@ function startLevel(i) {
 
   clearScene();
   W.reset();
-  P.hp = Math.max(P.hp, 60); P.dead = false;
+  clearSubtitles();
+  P.hp = Math.max(P.hp, 65); P.dead = false; P.firing = false;
   const cfg = LEVELS[i].build() || {};
   levelVhs = cfg.vhs || 0;
   updateHUD();
-  toast(`участок ${LEVELS[i].id} · «${LEVELS[i].name}»`);
+  toast(`глава ${LEVELS[i].id} · «${LEVELS[i].name}»`);
 
   running = true;
   setTimeout(() => { fade.style.opacity = 0; }, 100);
@@ -78,26 +75,23 @@ setLevelEndHandler(() => {
     const next = levelIdx + 1;
     if (LEVELS[next]?.build) startLevel(next);
     else {
-      // конец собранного участка
       localStorage.setItem(SAVE_KEY, String(levelIdx));
       hud.style.display = 'none';
       document.exitPointerLock();
       menu.style.display = 'flex';
       const sub = document.querySelector('#menu .sub');
-      sub.textContent = 'УЧАСТКИ 1–2 ОБСЛЕДОВАНЫ · ОСТАЛЬНЫЕ ОПЕЧАТАНЫ ДО СЛЕДУЮЩЕЙ СБОРКИ';
+      sub.textContent = 'ГЛАВЫ 1–4 ОБСЛЕДОВАНЫ · ДАЛЬШЕ — ОПЕЧАТАНО ДО СЛЕДУЮЩЕЙ СБОРКИ';
       fade.style.opacity = 0;
     }
   }, 1300);
 });
 
-/* ---------- ввод ---------- */
-
 document.addEventListener('mousedown', (e) => {
-  if (!running) return;
-  if (paperOpen()) return;
+  if (!running || paperOpen()) return;
   if (!E.pointerLocked) { lockPointer(); Snd.resume(); return; }
-  if (e.button === 0) attack();
+  if (e.button === 0) startFire();
 });
+document.addEventListener('mouseup', (e) => { if (e.button === 0) stopFire(); });
 
 document.addEventListener('keydown', (e) => {
   if (!running) return;
@@ -105,29 +99,19 @@ document.addEventListener('keydown', (e) => {
     if (paperOpen()) { hidePaper(); lockPointer(); return; }
     P._interactTarget?.use();
   }
-  if (e.code === 'KeyF') { P.flashOn = !P.flashOn; }
+  if (e.code === 'KeyF') P.flashOn = !P.flashOn;
+  if (e.code === 'KeyR') startReload();
   if (e.code === 'KeyG') {
     P.god = !P.god;
     toast(P.god ? 'режим наблюдателя: ВКЛ' : 'режим наблюдателя: ВЫКЛ');
     updateHUD();
   }
-  if (e.code === 'KeyR' && P.weapon > 1) {
-    // перезарядка через атаку при пустом магазине тоже работает
-    const w = P.weapon;
-    if (P.clip[w] < P.clipSize[w] && P.ammo[w] > 0) {
-      const need = P.clipSize[w] - P.clip[w];
-      const take = Math.min(need, P.ammo[w]);
-      P.clip[w] += take; P.ammo[w] -= take;
-      updateHUD();
-    }
-  }
   if (e.code === 'Digit1') switchWeapon(1);
   if (e.code === 'Digit2') switchWeapon(2);
   if (e.code === 'Digit3') switchWeapon(3);
+  if (e.code === 'Digit4') switchWeapon(4);
   if (e.code === 'Escape' && paperOpen()) hidePaper();
 });
-
-/* ---------- цикл ---------- */
 
 let last = performance.now();
 function loop(now) {
