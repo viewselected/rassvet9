@@ -58,7 +58,7 @@ void main(){
   float lineShift = (rnd(vec2(floor(uv.y * 540.0), floor(time * 12.0))) - 0.5) * 0.003 * vhs;
   uv.x += lineShift;
 
-  vec3 col = texture2D(tex, uv).rgb;
+  vec3 col = texture2D(tex, uv).rgb * 1.3;
 
   // тонкое квантование: больше ступеней чем в v1 — картинка богаче, зерно тоньше
   float d = bayer(gl_FragCoord.xy) / 48.0;
@@ -66,7 +66,7 @@ void main(){
 
   col *= 0.98 + 0.02 * sin(uv.y * 540.0 * 3.14159);
   col += (rnd(uv * time) - 0.5) * (0.014 + 0.05 * vhs);
-  col *= 1.0 - dot(cc, cc) * 0.35;
+  col *= 1.0 - dot(cc, cc) * 0.15;
 
   if(uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) col = vec3(0.0);
   gl_FragColor = vec4(col, 1.0);
