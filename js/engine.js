@@ -64,9 +64,9 @@ void main(){
   float d = bayer(gl_FragCoord.xy) / 48.0;
   col = floor((col + d) * 48.0) / 48.0;
 
-  col *= 0.965 + 0.035 * sin(uv.y * 540.0 * 3.14159);
-  col += (rnd(uv * time) - 0.5) * (0.022 + 0.07 * vhs);
-  col *= 1.0 - dot(cc, cc) * 0.75;
+  col *= 0.98 + 0.02 * sin(uv.y * 540.0 * 3.14159);
+  col += (rnd(uv * time) - 0.5) * (0.014 + 0.05 * vhs);
+  col *= 1.0 - dot(cc, cc) * 0.35;
 
   if(uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) col = vec3(0.0);
   gl_FragColor = vec4(col, 1.0);
