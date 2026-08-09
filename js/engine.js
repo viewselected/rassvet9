@@ -1,17 +1,16 @@
-// ПРОСВЕТ-9 · движок: PSX-рендер и ввод
+// ПРОСВЕТ-9 v2 · движок
 import * as THREE from 'three';
 
 export const E = {
   renderer: null, scene: null, camera: null,
   rt: null, postScene: null, postCam: null, postMat: null,
   keys: {}, mouseDX: 0, mouseDY: 0, pointerLocked: false,
-  clock: new THREE.Clock(),
-  RES_H: 270, // высота внутреннего рендера — PSX-сердце всей картинки
+  RES_H: 540, // x2 к первой версии
+  shake: 0,
 };
 
-const JITTER = 160.0; // сетка привязки вершин (меньше = сильнее дрожь)
+const JITTER = 420.0; // при новом разрешении дрожь тоньше, но всё ещё живая
 
-// патч материала: привязка вершин к сетке в clip space — фирменная дрожь PS1
 export function psxify(material) {
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader.replace(
@@ -33,12 +32,11 @@ const POST_FRAG = `
 precision highp float;
 uniform sampler2D tex;
 uniform float time;
-uniform float vhs;      // 0..1 сила помех
+uniform float vhs;
 varying vec2 vUv;
 
 float rnd(vec2 co){ return fract(sin(dot(co, vec2(12.9898,78.233))) * 43758.5453); }
 
-// байеровский дизеринг 4x4
 float bayer(vec2 p){
   int x = int(mod(p.x, 4.0));
   int y = int(mod(p.y, 4.0));
@@ -54,28 +52,21 @@ float bayer(vec2 p){
 
 void main(){
   vec2 uv = vUv;
-  // лёгкое искривление трубки
   vec2 cc = uv - 0.5;
-  uv = uv + cc * dot(cc, cc) * 0.08;
+  uv = uv + cc * dot(cc, cc) * 0.06;
 
-  // vhs: строчный сдвиг
-  float lineShift = (rnd(vec2(floor(uv.y * 270.0), floor(time * 12.0))) - 0.5) * 0.004 * vhs;
+  float lineShift = (rnd(vec2(floor(uv.y * 540.0), floor(time * 12.0))) - 0.5) * 0.003 * vhs;
   uv.x += lineShift;
 
   vec3 col = texture2D(tex, uv).rgb;
 
-  // квантование цвета + дизеринг = ретро-градиенты
-  float d = bayer(gl_FragCoord.xy) / 24.0;
-  col = floor((col + d) * 24.0) / 24.0;
+  // тонкое квантование: больше ступеней чем в v1 — картинка богаче, зерно тоньше
+  float d = bayer(gl_FragCoord.xy) / 48.0;
+  col = floor((col + d) * 48.0) / 48.0;
 
-  // сканлайны
-  col *= 0.94 + 0.06 * sin(uv.y * 270.0 * 3.14159);
-
-  // зерно
-  col += (rnd(uv * time) - 0.5) * (0.035 + 0.09 * vhs);
-
-  // виньетка
-  col *= 1.0 - dot(cc, cc) * 0.9;
+  col *= 0.965 + 0.035 * sin(uv.y * 540.0 * 3.14159);
+  col += (rnd(uv * time) - 0.5) * (0.022 + 0.07 * vhs);
+  col *= 1.0 - dot(cc, cc) * 0.75;
 
   if(uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) col = vec3(0.0);
   gl_FragColor = vec4(col, 1.0);
@@ -87,7 +78,7 @@ export function initEngine() {
   E.renderer.setPixelRatio(1);
 
   E.scene = new THREE.Scene();
-  E.camera = new THREE.PerspectiveCamera(72, 16/9, .1, 400);
+  E.camera = new THREE.PerspectiveCamera(74, 16/9, .08, 500);
 
   E.postScene = new THREE.Scene();
   E.postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -133,6 +124,11 @@ function resize() {
 export function renderFrame(t, vhsAmount = 0) {
   E.postMat.uniforms.time.value = t;
   E.postMat.uniforms.vhs.value = vhsAmount;
+  if (E.shake > 0) {
+    E.camera.position.x += (Math.random()-.5) * E.shake * .06;
+    E.camera.position.y += (Math.random()-.5) * E.shake * .06;
+    E.shake = Math.max(0, E.shake - .08);
+  }
   E.renderer.setRenderTarget(E.rt);
   E.renderer.render(E.scene, E.camera);
   E.renderer.setRenderTarget(null);
@@ -148,4 +144,23 @@ export function clearScene() {
       if (c.material) (Array.isArray(c.material) ? c.material : [c.material]).forEach(m => m.dispose());
     });
   }
+}
+
+/* сегмент-AABB: линия видимости и попадания сквозь стены */
+export function segmentHitsAABB(a, b, min, max) {
+  let tmin = 0, tmax = 1;
+  const d = { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z };
+  for (const ax of ['x', 'y', 'z']) {
+    if (Math.abs(d[ax]) < 1e-8) {
+      if (a[ax] < min[ax] || a[ax] > max[ax]) return false;
+    } else {
+      let t1 = (min[ax] - a[ax]) / d[ax];
+      let t2 = (max[ax] - a[ax]) / d[ax];
+      if (t1 > t2) [t1, t2] = [t2, t1];
+      tmin = Math.max(tmin, t1);
+      tmax = Math.min(tmax, t2);
+      if (tmin > tmax) return false;
+    }
+  }
+  return true;
 }
